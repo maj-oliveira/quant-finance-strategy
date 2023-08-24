@@ -1,11 +1,12 @@
+from abc import ABC, abstractmethod
+
 from datetime import date, timedelta
 import pandas as pd
-from xbbg import blp
 import joblib
 
-class Backtest:
+class Backtest(ABC):
 
-    def __init__(self,start_date:date, end_date:date,delta:timedelta, init_NAV:float = 1):
+    def __init__(self,start_date:date, end_date:date, delta:timedelta, init_NAV:float = 1):
         self.start_date = start_date
         self.end_date = end_date
         self._init_NAV = init_NAV
@@ -16,6 +17,7 @@ class Backtest:
         self.lista_modelos = None
         self.lista_scalers = None
 
+    @abstractmethod
     def new_year(self):
         pass
     
@@ -39,6 +41,7 @@ class Backtest:
         df_predictions = df_predictions.reset_index(drop=True)
         return df_predictions
     
+    @abstractmethod
     def get_data(self) -> pd.DataFrame:
         #Implement here your data getter
         return None
@@ -102,3 +105,7 @@ class Backtest:
 
     def get_portfolio_over_time(self) -> pd.DataFrame:
         return self._df_portfolio_over_time
+    
+    def set_date_indicator(self, date_set:date) -> None:
+        self._date_indicator = date_set
+        
