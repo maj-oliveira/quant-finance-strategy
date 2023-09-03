@@ -1,21 +1,36 @@
-from abc import ABC, abstractmethod
+"""
+    @author: Matheus José Oliveira dos Santos
+    Last Edit: 03/09/2023
+"""
 
+from abc import ABC, abstractmethod
 from datetime import date, timedelta
+
 import pandas as pd
 import joblib
+import tensorflow as tf
+import numpy as np
 
 class Backtest(ABC):
 
     def __init__(self,start_date:date, end_date:date, delta:timedelta, init_NAV:float = 1):
+        #get initial parameters
         self.start_date = start_date
         self.end_date = end_date
         self._init_NAV = init_NAV
         self._delta = delta
-        self._df_performance = pd.DataFrame()
-        _new_row = {"Date":start_date, "NAV":self._init_NAV}
-        self._df_performance=self._df_performance.append(_new_row, ignore_index=True)
+
+        #create df_performance
+        self._df_performance = pd.DataFrame(columns=['Date','NAV'])
+        _new_row = {"Date":self.start_date, "NAV":self._init_NAV}
+        self._df_performance = pd.concat([self._df_performance, pd.DataFrame([_new_row])], ignore_index=True)
+
+        #set models and scalers to None
         self.lista_modelos = None
         self.lista_scalers = None
+
+        #save the order of the securities
+        self._order_BBGTicker = None
 
     @abstractmethod
     def new_year(self):
@@ -30,11 +45,11 @@ class Backtest(ABC):
     def new_day(self):
         pass
 
-    def make_predictions(self,model_path:str, df_sample:pd.DataFrame):
+    def make_predictions(self,model_path:str, ar_sample:pd.DataFrame) -> pd.DataFrame:
         model = tf.keras.models.load_model(model_path)
-        predictions = model.predict(df_sample[:,1:])
+        predictions = model.predict(ar_sample)
         df_predictions = pd.DataFrame(predictions)
-        df_predictions.insert(0,'BBGTicker', df_sample['BBGTicker'])
+        df_predictions.insert(0,'BBGTicker', self._order_BBGTicker)
         df_predictions.rename(columns={0:'probability', 'BBGTicker':'BBGTicker'}, inplace=True)
         df_predictions = df_predictions.reindex(columns=['BBGTicker','probability'])
         df_predictions = df_predictions.sort_values(by='probability', ascending=False)
@@ -42,13 +57,18 @@ class Backtest(ABC):
         return df_predictions
     
     @abstractmethod
-    def get_data(self) -> pd.DataFrame:
+    def get_data(self) -> np.array:
         #Implement here your data getter
+        #The function has no input and must return a numpy array of the data sample scaled
+        #This numpy array will be the input for the make_prediction function
+
         return None
 
+    @abstractmethod
     def allocation(self, df_input:pd.DataFrame) -> pd.DataFrame:
-        df_aloc = simple_allocation(df_input)
-        return df_aloc
+        #Implement here your allocation function
+        #
+        return None
 
     def simple_allocation(self, df_input:pd.DataFrame) -> pd.DataFrame:
         df_aloc = pd.DataFrame()
@@ -85,8 +105,8 @@ class Backtest(ABC):
             #somar delta para data final
             week_end = self._date_indicator - timedelta(days=7) + self._delta - timedelta(days=1)
 
-            self._df_sample = self.get_data()
-            self._df_predictions = self.make_predictions(self._model, self._df_sample) #predict
+            self._ar_sample = self.get_data()
+            self._df_predictions = self.make_predictions(self._model, self._ar_sample) #predict
             self._df_aloc = allocation(self._df_predictions) #allocation
 
             self._df_portfolio_over_time = pd.concat([self._df_portfolio_over_time, self._df_aloc], ignore_index=True)
@@ -108,4 +128,9 @@ class Backtest(ABC):
     
     def set_date_indicator(self, date_set:date) -> None:
         self._date_indicator = date_set
-        
+    
+    def set_model(self, model_name:str) -> None:
+        self._model = model_name
+    
+    def set_scaler(self,scaler_name:str) -> None:
+        self._sc = scaler_name
