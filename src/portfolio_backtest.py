@@ -5,6 +5,7 @@
 
 from abc import ABC, abstractmethod
 from datetime import date, timedelta
+from typing import List
 
 import pandas as pd
 import joblib
@@ -76,8 +77,28 @@ class Backtest(ABC):
         df_aloc['%AUM'] = 0.1
         return df_aloc
 
-    def performance_portfolio_period(self):
+    @abstractmethod
+    def return_securities(list_securities: List[str], week_start:date, week_end:date) -> pd.DataFrame:
+        #implement here your return of securities function
+        #
         pass
+
+    def performance_portfolio_period(self) -> pd.DataFrame:
+        list_aloc = df_aloc['BBGTicker'].tolist()
+        ret = returns_stocks(list_aloc, week_start,week_end)
+        ret=ret.transpose()
+        ret = ret.reset_index(drop=True)
+        df_aloc['returns'] = ret.iloc[:,0]+1
+        df_aloc['returns'] = df_aloc['returns'].fillna(1)
+        print(df_aloc)
+        return_week = np.dot(df_aloc['returns'],df_aloc['%AUM'])
+        print(return_week)
+        NAV = df_performance.iloc[-1,1]*return_week
+    
+        new_row = {"Date":week_end, "NAV":NAV}
+        df_performance = df_performance.append(new_row, ignore_index=True)
+        
+        return df_performance
 
     def executar(self):
         
